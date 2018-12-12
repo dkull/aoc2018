@@ -3,12 +3,13 @@ open Stdio
 open Set
 ;;
 
+type pi = { mutable x: int ; mutable y: int ; xvec: int ; yvec: int } ;; 
 module PointInfo = struct
   module T = struct
-    type t = (int * int)
+    type t = pi
     let compare t1 t2 =
-      let c1 = Int.compare (fst t1) (fst t2) in
-      let c2 = Int.compare (snd t1) (snd t2) in
+      let c1 = Int.compare t1.x t2.x in
+      let c2 = Int.compare t1.y t2.y in
       match c1 with
       | -1 -> -1
       | 1 -> 1
@@ -16,14 +17,12 @@ module PointInfo = struct
       | _ -> 0
 
     let sexp_of_t t : Sexp.t =
-      List [ Int.sexp_of_t (fst t) ; Int.sexp_of_t (snd t) ]
+      List [ Int.sexp_of_t t.x ; Int.sexp_of_t t.y ]
 
   end
   include T
   include Comparator.Make(T)
 end ;;
-
-type point_info = { mutable x: int ; mutable y: int ; xvec: int ; yvec: int } ;;
 
 let filter_numbers line =
   let re_remove = Str.regexp "[a-z<>,=]+" in
@@ -74,14 +73,9 @@ let apply_vector ?(reverse=false) point =
   ()
 ;;
 
-let create_lookuptable pts = 
-  let points = pts |> (List.map ~f:(fun p ->
-      (p.x, p.y)
-    ))
-  in
-  Set.of_list (module PointInfo) points
+let create_lookuptable pts =
+  Set.of_list (module PointInfo) pts
 ;;
-
 
 let draw_points points =
   let lookup = create_lookuptable points in
@@ -89,7 +83,8 @@ let draw_points points =
   in
   let l, r, t, b, w, h = get_stats points in
   let rec draw_cell xfrom xat xto yfrom yat yto =
-    let _ = match Set.mem lookup (xat, yat) with
+    let lookupkey = {x=xat; y=yat; xvec=0; yvec=0} in
+    let _ = match Set.mem lookup lookupkey with
     | true -> Stdio.printf "X"
     | false -> Stdio.printf "."
     in
