@@ -75,10 +75,12 @@ let part2_match recipes target =
         match offset with
         | 0 -> []
         | _ ->
-          let recp = Hashtbl.find_exn recipes (recipes_count-offset) in
+          let recp = Hashtbl.find_exn recipes (recipes_count-offset-1) in
           recp :: getlast recipes (offset-1)
       in
       let last_recipes = getlast recipes (List.length target) in
+      (* let _ = List.iter last_recipes ~f:(fun x -> Stdio.printf "%d " x) in
+       * let _= Stdio.printf "\n" in *)
       let are_match =  comp_list target last_recipes in
       if are_match then
         let _ = Stdio.printf "Returning MATCH\n" in
@@ -90,7 +92,7 @@ let part1done = ref false ;;
 let part2done = ref false ;;
 
 let rec mainloop until recipes elves p2target =
-  let _ = if !part1done || !part2done then
+  let _ = if !part1done && !part2done then
     raise @@ Failure "Done"
   else
     ()
