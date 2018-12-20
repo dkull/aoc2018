@@ -22,7 +22,7 @@ module Coordinate = struct
   include Comparator.Make(T)
 end ;;
 
-type direction = Left | Right ;;
+type direction = Down | Left | Right ;;
 type tile = Clay | Flow | Water ;;
 
 let ground_map =
@@ -88,14 +88,20 @@ let y_max = Hashtbl.keys ground_map |> List.fold ~init:(-100) ~f:(fun acc x -> m
 let claycount map = Hashtbl.count map ~f:(fun x -> true) ;;
 let clcnt = claycount ground_map ;;
 
-let calc_score map =
-  let scorers = Hashtbl.filteri map ~f:(fun ~key:k ~data:d ->
+let print_score map =
+  let scorers1 = Hashtbl.filteri map ~f:(fun ~key:k ~data:d ->
       k.y >= y_min && k.y <= y_max && match d with | Flow | Water -> true | _ -> false
     ) in
-  List.length @@ Hashtbl.keys scorers
+  let _ = Stdio.printf "Part1 score %d\n" @@ List.length @@ Hashtbl.keys scorers1 in
+  let scorers2 = Hashtbl.filteri map ~f:(fun ~key:k ~data:d ->
+      k.y >= y_min && k.y <= y_max && match d with | Water -> true | _ -> false
+    ) in
+  let _ = Stdio.printf "Part2 score %d\n" @@ List.length @@ Hashtbl.keys scorers2 in
+  ()
 ;;
 
 let print_map map coord radius =
+  (* Prints map to terminal *)
   let x_from, x_to = coord.x - radius*2, coord.x + (radius*2) in
   let y_from, y_to = coord.y - radius, coord.y + radius in
   let xs = Array.of_list @@ List.range x_from (x_to) in
@@ -127,6 +133,7 @@ let print_map map coord radius =
 ;;
 
 let map_to_pgm map =
+  (* Prints out map as PGM image *)
   let values = Hashtbl.keys map in
   let x_from = (List.fold values ~init:1000 ~f:(fun acc x -> min acc x.x)) -1 in
   let x_to = (List.fold values ~init:0 ~f:(fun acc x-> max acc (x.x))) + 1 in
@@ -167,29 +174,25 @@ let map_to_pgm map =
 ;;
 
 let check_move map coord =
-  coord
-  |> Hashtbl.find map
-  |> (fun tile -> match tile with
-      | None -> Ok coord, None
-      | Some tile -> match tile with
-        | Clay | Water | Flow -> Error coord, Some tile
-    )
+  if coord.y <= y_max then
+    coord |> Hashtbl.find map
+  else
+    Some Flow
 ;;
 
-let move_stream_down map coord =
-  let new_coord = { coord with y = coord.y + 1} in
-  new_coord |> check_move map
+let move_coordinate ~dir coordinate =
+  match dir with
+  | Down -> {coordinate with y = coordinate.y+1}
+  | Left -> {coordinate with x = coordinate.x-1}
+  | Right -> {coordinate with x = coordinate.x+1}
 ;;
 
-let move_stream_sideways ~dir map coord =
-  let new_coord = match dir with
-    | Left -> { coord with x = coord.x - 1}
-    | Right -> { coord with x = coord.x + 1}
-  in
-  new_coord |> check_move map
+let tile_blocked map coord ~dir =
+  Hashtbl.mem map (move_coordinate ~dir:dir coord)
 ;;
 
 let make_layer_flow map coord =
+  let _ = Stdio.printf "Flowing layer on %d,%d\n" coord.x coord.y in
   let rec step ~xstep coord =
     Hashtbl.find map coord
     |> (fun x -> match x with
@@ -207,89 +210,67 @@ let make_layer_flow map coord =
   ()
 ;;
 
-let rec process_streams map streams =
-  match streams with
-  | [] -> false, false
-  | stream :: t ->
-    (* let _ = print_map ground_map {x= stream.x; y=stream.y} 10 in *)
-    let moved_to, tile_at_coord = move_stream_down map stream in
-    let branch_flow, is_water = match moved_to with
-      | Ok coord -> begin match coord with
-        | c when c.y > y_max ->
-          let _ = Stdio.printf "Hit down edge at %d %d starting %b %b\n" coord.x coord.y false false in
-          false, false
-        | _ ->
-          let _ = Hashtbl.set map coord Flow in
-          let result = process_streams map (coord :: t) in
-          let _ = Stdio.printf "Returning from down at %d %d starting %b %b\n" coord.x coord.y (fst result) (snd result) in
-          result
-        end
-      | Error coord ->
-        let _ = Stdio.printf "Down hit something on %d,%d\n" coord.x coord.y in
-        match tile_at_coord with
-        | Some Flow -> false, false
-        | _ -> true, true
-        (* match tile_at_coord with
-         * | None -> true, true
-         * | Some t -> match t with
-         *   | Water -> true, true
-         *   | Clay -> true, false
-         *   | Flow -> false, false *)
-    in
-    if branch_flow then
-      let left_moved_to, tile_left = move_stream_sideways ~dir:Left map stream in
-      let left_allows_branch, is_water_left = match left_moved_to with
-        | Ok coord ->
-          let _ = Hashtbl.set map coord Water in
-          let res = process_streams map (coord :: t) in
-          let _ = Stdio.printf "Left returning from %d,%d with %b %b\n" coord.x coord.y (fst res) (snd res) in
-          res
-        | Error coord ->
-          let _ = Stdio.printf "Left error started true,true from %d,%d\n" coord.x coord.y in
-          true, true
-          (* match tile_left with
-           * | Some Flow | Some Water-> true, false
-           * | _ -> true, true *)
-      in
-      let right_moved_to, tile_right = move_stream_sideways ~dir:Right map stream in
-      let right_allows_branch, is_water_right = match right_moved_to with
-        | Ok coord ->
-          let _ = Hashtbl.set map coord Water in
-          let res = process_streams map (coord :: t) in
-          let _ = Stdio.printf "Right returning from %d,%d with %b %b\n" coord.x coord.y (fst res) (snd res) in
-          res
-        | Error coord ->
-          let _ = Stdio.printf "Right error started true,true from %d,%d\n" coord.x coord.y in
-          true, true
-          (* match tile_right with
-           * | Some Flow | Some Water -> true, false
-           * | _ -> true, true *)
-      in
-      let all_water = is_water_left && is_water_right in
-      let _ = Stdio.printf "Make flow layer? %d,%d %b %b %b\n" stream.x stream.y is_water is_water_left is_water_right in
-      let _ = if not all_water then
-        make_layer_flow map stream
-        else
-          Hashtbl.set map stream Water
+let dir_repr dir =
+  match dir with
+  | Left -> "Left"
+  | Right -> "Right"
+  | Down -> "Down"
 
-      (* let _ = match tile_at_coord with
-       *   | Some Water ->
-       *     if not all_water  then
-       *       let _ = Stdio.printf "%d,%d making layer flow %b %b\n" stream.x stream.y is_water_left is_water_right in
-       *       make_layer_flow map stream
-       *   | _ ->
-       *     let _ = Stdio.printf "Not making layer b/c tile is wrong\n" in
-       *     Hashtbl.set map stream Water *)
+let tile_repr tile =
+  match tile with
+  | Some Clay -> "Clay"
+  | Some Water -> "Water"
+  | Some Flow -> "Flow"
+  | None -> "None"
+
+let rec process_streams2 map streams =
+  match streams with
+  | [] -> None
+  | stream :: t ->
+    let movedir, coordinate = stream in
+    let bumped_into = check_move map coordinate in
+    match bumped_into with
+    | Some tile -> Some tile
+    | None ->
+      let _ = match movedir with
+        | Down -> Hashtbl.set map coordinate Flow
+        | Left | Right -> Hashtbl.set map coordinate Water
       in
-      (left_allows_branch && right_allows_branch), (is_water_right && is_water_left)
-    else
-      branch_flow, is_water
-in
-let streams = [ {x= 500 ; y= 0} ] in
-let _ = process_streams ground_map streams in
-let _ = Stdio.printf "New score %d\n" @@ calc_score ground_map in
-let _ = Stdio.printf "ymin %d ymax %d %d\n" y_min y_max in
-let _ = print_map ground_map {x=500; y= 1} 10 in
+      (* let _ = print_map map {x= coordinate.x; y=coordinate.y} 10 in *)
+
+      let moved_coordinate = move_coordinate ~dir:movedir coordinate in
+      let moved_stream = if tile_blocked map moved_coordinate ~dir:Down then
+        movedir, moved_coordinate
+      else
+        Down, moved_coordinate
+      in
+
+      let move_result = process_streams2 map (moved_stream :: t) in
+      match move_result with
+      | None -> None
+      | Some Flow ->
+        Some Flow
+      | Some Water | Some Clay ->
+        match movedir with
+        | Right | Left -> move_result
+        | Down ->
+          let _ = Hashtbl.set map coordinate Water in
+          let stream = Left, move_coordinate ~dir:Left coordinate in
+          let res_left = process_streams2 map (stream :: t) in
+          let stream = Right, move_coordinate ~dir:Right coordinate in
+          let res_right = process_streams2 map (stream :: t) in
+          match res_left, res_right with
+          | Some Flow, _ | _, Some Flow ->
+            let _ = make_layer_flow map coordinate in
+            Some Flow
+          | _ ->
+            let _ = Hashtbl.set map coordinate Water in
+            Some Water
+;;
+
+let streams = [ (Down, {x= 500 ; y= 0}) ] in
+let _ = process_streams2 ground_map streams in
+let _ = print_score ground_map in
 let _ = map_to_pgm ground_map in
 0
 
