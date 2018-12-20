@@ -100,6 +100,13 @@ Stdio.printf "Part1: %d\n" @@ mainloop 0 registers1 ~ip:0
 ;;
 
 (* Did part 2 manually using factor and a calculator shell *)
+(*
+   Reg 3 contained 10551425
+   Used factors to get: 5 5 422057
+    >>> a = 5; b = 5; c=422057
+    >>> 1 + a + (a*b) + c + (a*c) + 10551425
+    13083798
+*)
 
 (* let registers2 = Array.create ~len:6 0 in
  * let _ = Array.set registers2 0 1 in
