@@ -192,7 +192,6 @@ let tile_blocked map coord ~dir =
 ;;
 
 let make_layer_flow map coord =
-  let _ = Stdio.printf "Flowing layer on %d,%d\n" coord.x coord.y in
   let rec step ~xstep coord =
     Hashtbl.find map coord
     |> (fun x -> match x with
