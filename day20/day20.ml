@@ -1,5 +1,6 @@
 open Base
 open Stdio
+open Caml.Stack
 ;;
 
 (* Make xy hashable - really want to know a better way *)
@@ -50,7 +51,7 @@ let box_draw room =
   | _ -> "?"
 ;;
 
-let print_map () =
+let print_map ?at () =
   let coords = List.sort ~compare:Coordinate.compare @@ Hashtbl.keys field in
   let xs = List.map coords ~f:(fun xy -> xy.x ) in
   let ys = List.map coords ~f:(fun xy -> xy.y ) in
@@ -74,9 +75,13 @@ let print_map () =
         else
           ()
       in
-      let symbol = match Hashtbl.find field xy with
-      | None -> "."
-      | Some room -> box_draw room
+      let symbol =
+        match at with
+        | Some at when at.x = xy.x && at.y = xy.y -> "X"
+        | Some _ | None ->
+          match Hashtbl.find field xy with
+          | None -> "."
+          | Some room -> box_draw room
       in
       Stdio.printf "%s" symbol
   )
@@ -133,30 +138,40 @@ let handle_token (at_xy:xy) token =
   new_xy
 ;;
 
-let rec mainloop at_xy tokens =
+let rec mainloop at_xy tokens continues =
   match tokens with
   | [] -> []
   | token :: t ->
     let new_xy = handle_token at_xy token in
     match new_xy with
     | Some xy ->
-      let _ = Stdio.printf "%c From %d,%d to %d,%d\n" token at_xy.x at_xy.y xy.x xy.y in
-      mainloop xy t
+      (* let _ = Stdio.printf "%c From %d,%d to %d,%d\n" token at_xy.x at_xy.y xy.x xy.y in *)
+      (* let _ = print_map ~at:xy () in *)
+      mainloop xy t continues
     | None ->
+      (* let _ = Stdio.printf "%c\n" token in *)
       match token with
       | '(' ->
-        let new_tokens = mainloop at_xy t in
-        mainloop at_xy new_tokens
-      | '|' -> t
-      | ')' -> mainloop at_xy t
-      | '^' | '$' -> mainloop at_xy t
+        let _ = Caml.Stack.push at_xy continues in
+        mainloop at_xy t continues
+      | '|' ->
+        if Caml.Stack.is_empty continues then
+          mainloop at_xy t continues
+        else
+          let prev_cont = Caml.Stack.top continues in
+          mainloop prev_cont t continues
+      | ')' ->
+        let _ = Caml.Stack.pop continues in
+        mainloop at_xy t continues
+      | '^' | '$' -> mainloop at_xy t continues
       | _ -> raise @@ Failure "Badtoken"
 ;;
 
 let input_line = Stdio.In_channel.input_line_exn Stdio.stdin  ;;
 let initial_coordinate = { x= 0 ; y= 0 } ;;
 
-mainloop initial_coordinate (String.to_list input_line) ;;
+let continue_stack = Caml.Stack.create () ;;
+mainloop initial_coordinate (String.to_list input_line) continue_stack ;;
 
 print_map () ;;
 
