@@ -175,3 +175,27 @@ mainloop initial_coordinate (String.to_list input_line) continue_stack ;;
 
 print_map () ;;
 
+let default_distance = (fun () -> 1000000) ;;
+let distance_lookup = Hashtbl.create (module Coordinate) ;;
+let rec distance_map distance xy =
+  let cell_distance = Hashtbl.find_or_add distance_lookup xy ~default:default_distance in
+  let cell = Hashtbl.find_exn field xy in
+  if distance < cell_distance then
+    let _ = Hashtbl.set distance_lookup xy distance in
+    let _ = if cell.t then distance_map (distance+1) (target_location xy N) in
+    let _ = if cell.b then distance_map (distance+1) (target_location xy S) in
+    let _ = if cell.l then distance_map (distance+1) (target_location xy W) in
+    let _ = if cell.r then distance_map (distance+1) (target_location xy E) in
+    ()
+  else
+    ()
+;;
+distance_map 0 initial_coordinate ;;
+
+let distances = Hashtbl.data distance_lookup in
+let longest = List.reduce_exn ~f:max distances in
+let _ = Stdio.printf "Part1: %d\n" longest in
+let over1k = List.count distances ~f:(fun dist -> dist >= 1000) in
+let _ = Stdio.printf "Part2: %d\n" over1k in
+()
+
