@@ -1,16 +1,24 @@
 # aoc2018
 Learning OCaml with Advent Of Code 2018
 
-# In dir with eg. day23.ml:
-ocamlbuild -ocamlopt "ocamlopt -O3 -unsafe" -use-menhir -package stdio,base day23.native && cat day23.input | ./day23.native
+# Compile for performance:
+In dir with eg. day25.ml:
+(produces day25.native executable)
+```
+ocamlbuild -ocamlopt "ocamlopt -O3 -unsafe -rounds 10 " -use-menhir -package stdio,base day25.native
+```
 
-# Or minimally: 
-ocamlbuild -package stdio,base day23.native
-cat day23.input | ./day23.native
+# Simplest compile:
+```
+ocamlbuild -package stdio,base day25.native
+```
 
 # Another way
-# optional: -g -O3 -p, etc
-ocamlfind ocamlopt -O3 -linkpkg -package base,stdio day21.ml
+(optional flags: -g -O3 -p, etc)
+(produces a.out executable)
+```
+ocamlfind ocamlopt -O3 -linkpkg -package base,stdio day25.ml
+```
 
-# If solution needs input it needs to given in stdin, eg:
-cat day21.input | time ./a.out
+# All input is read from stdin:
+cat day25.input | ./day25.native
